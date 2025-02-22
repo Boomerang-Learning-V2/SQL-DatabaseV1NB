@@ -1,12 +1,13 @@
 -- Enable UUID generation
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Drop tables in order (due to FK dependencies)
+-- Drop tables in proper order
 DROP TABLE IF EXISTS ChatMemoryLog CASCADE;
 DROP TABLE IF EXISTS ProgressTracking CASCADE;
 DROP TABLE IF EXISTS Content CASCADE;
 DROP TABLE IF EXISTS Students CASCADE;
 DROP TABLE IF EXISTS Users CASCADE;
+DROP TABLE IF EXISTS PlatformSettings CASCADE;
 
 -- Users: basic login info (email, username, pass, first/last, role)
 CREATE TABLE Users (
@@ -16,7 +17,7 @@ CREATE TABLE Users (
     PasswordHash VARCHAR(255) NOT NULL,
     FirstName VARCHAR(100) NOT NULL,
     LastName VARCHAR(100) NOT NULL,
-    Role VARCHAR(50) NOT NULL, -- Teacher, Parent, Tutor, Student
+    Role VARCHAR(50) NOT NULL,  -- Teacher, Parent, Tutor, Student
     CreatedAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -24,11 +25,11 @@ CREATE TABLE Users (
 CREATE TABLE Students (
     StudentId SERIAL PRIMARY KEY,
     UserId INT NOT NULL UNIQUE REFERENCES Users(UserId) ON DELETE CASCADE,
-    Grade VARCHAR(10), -- e.g., '5', '6', etc.
+    Grade VARCHAR(10),
     DateOfBirth DATE
 );
 
--- Content: assignments, vids, etc.
+-- Content: assignments, videos, etc.
 CREATE TABLE Content (
     ContentId SERIAL PRIMARY KEY,
     Title VARCHAR(255) NOT NULL,
@@ -38,12 +39,12 @@ CREATE TABLE Content (
     CreatedAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
--- Progress: logs user progress on content
+-- ProgressTracking: logs user progress on content
 CREATE TABLE ProgressTracking (
     ProgressId SERIAL PRIMARY KEY,
     UserId INT NOT NULL REFERENCES Users(UserId),
     ContentId INT NOT NULL REFERENCES Content(ContentId),
-    Status VARCHAR(50) NOT NULL, -- 'Not Started','In Progress','Completed'
+    Status VARCHAR(50) NOT NULL,  -- 'Not Started','In Progress','Completed'
     LastUpdated TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
@@ -81,6 +82,24 @@ CREATE TRIGGER limit_memory_log_trigger
 AFTER INSERT ON ChatMemoryLog
 FOR EACH ROW EXECUTE FUNCTION limit_memory_log_fn();
 
+-- PlatformSettings: global platform preferences
+CREATE TABLE PlatformSettings (
+    SettingId SERIAL PRIMARY KEY,
+    SettingName VARCHAR(100) NOT NULL UNIQUE,
+    SettingValue TEXT,
+    Description TEXT,
+    CreatedAt TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+-- Insert sample settings
+INSERT INTO PlatformSettings (SettingName, SettingValue, Description)
+VALUES
+('default_color_theme', 'light', 'Default theme (options: light, dark)'),
+('default_language', 'en', 'Default language code'),
+('items_per_page', '10', 'Default number of items per page'),
+('enable_notifications', 'true', 'Toggle platform-wide notifications'),
+('max_chat_memory', '30', 'Max chat logs per conversation');
+
 -- Sample Users
 -- Teachers
 INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, Role)
@@ -102,7 +121,7 @@ VALUES
 ('tutor1@example.com','tutor1','hashed789','Carol','Davis','Tutor'),
 ('tutor2@example.com','tutor2','hashed890','James','Wilson','Tutor');
 
--- Students (insert Users first, then add student-specific data)
+-- Students (insert Users first, then student-specific data)
 INSERT INTO Users (Email, Username, PasswordHash, FirstName, LastName, Role)
 VALUES
 ('student1@example.com','student1','hashedabc','Lucy','Thompson','Student'),
@@ -123,7 +142,7 @@ VALUES
 ('Math Homework - Fractions','Practice fractions for grade 5.','https://example.com/math-fractions',1),
 ('Science Video: Solar System','Intro video on planets.','https://example.com/solar-system',1);
 
--- Sample Progress (for Parent Bob [UserId=4] & Student Lucy [UserId=10])
+-- Sample ProgressTracking (for Parent Bob [UserId=4] & Student Lucy [UserId=10])
 INSERT INTO ProgressTracking (UserId, ContentId, Status)
 VALUES
 (4, 1, 'Completed'),
